@@ -1,0 +1,17 @@
+services:
+  otelcol:
+    container_name: otelcol
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app
+    ports:
+      - "8081:8081"
+      - "4317:4317"
+      - "2345:2345" # Debugger
+
+networks:
+  default:
+      name: opentelemetry-demo
+      external: true
