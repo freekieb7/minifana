@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	port = flag.Int("port", 4317, "The server port")
+	grpcPort = flag.Int("grpc_port", 4317, "The server's GRPC port")
+	httpPort = flag.Int("http_port", 4318, "The server's HTTP port")
 )
 
 func main() {
@@ -23,29 +24,42 @@ func main() {
 		Views: engine,
 	})
 
-	ms := NewMemoryStore()
+	ms := NewMetricsStore()
 
 	appService := NewAppService(ms)
 
 	app.Get("/", appService.Home)
-	app.Get("/values", appService.GetMetricValues)
-	//app.Get("/test", appService.Test)
+	app.Get("/metrics/names", appService.GetMetricNames)
+	app.Get("/metrics/test", appService.GetTest)
 
 	grpcService := NewGrpcService(ms)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	log.Printf("server listening at %v", lis.Addr())
 	go func() {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+
+		log.Printf("server listening at %v", lis.Addr())
 		if err := grpcService.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
 
+	go func() {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *httpPort))
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+
+		log.Printf("server listening at %v", lis.Addr())
+		if err := grpcService.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+
+		}
+	}()
+
 	log.Printf("server listening at %v", 8081)
 	app.Listen("0.0.0.0:8081")
-	
+
 }

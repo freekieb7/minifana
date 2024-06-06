@@ -12,10 +12,7 @@
 <body class="h-screen">
 <div>
     <label>Make</label>
-    <select name="attribute" hx-get="/test" hx-swap="none">
-        {{ range .Options }}
-        <option value={{ . }}>{{ . }}</option>
-        {{ end }}
+    <select hx-get="/metrics/names" hx-trigger="load" hx-swap="innerHTML">
     </select>
 </div>
 

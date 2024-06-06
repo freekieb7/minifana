@@ -15,11 +15,11 @@ type MetricsService interface {
 }
 
 type metricsService struct {
-	store MemoryStore
+	store MetricsStore
 	v1.UnimplementedMetricsServiceServer
 }
 
-func NewMetricsService(store MemoryStore) MetricsService {
+func NewMetricsService(store MetricsStore) MetricsService {
 	return &metricsService{
 		store: store,
 	}
@@ -30,39 +30,40 @@ func (s *metricsService) Register(grpcServer *grpc.Server) {
 }
 
 func (s *metricsService) Export(_ context.Context, req *v1.ExportMetricsServiceRequest) (*v1.ExportMetricsServiceResponse, error) {
-	// open a new log file
-	log, err := wal.Open("/minifana/metrics/wal", nil)
-
-	// write some entries
-	li, _ := log.LastIndex()
-	res, _ := proto.Marshal(req)
-
-	err = log.Write(li+1, res)
-
-	// close the log
-	err = log.Close()
-
-	if err != nil {
+	if err := writeToWal(req); err != nil {
 		return new(v1.ExportMetricsServiceResponse), err
 	}
 
-	serviceNames := make([]string, 0)
-
-	for _, rm := range req.ResourceMetrics {
-		for _, att := range rm.Resource.Attributes {
-			if "service.name" == att.Key {
-				serviceNames = append(serviceNames, att.Value.GetStringValue())
-				//s.store.AddValue(att.Value.GetStringValue())
-				//s.serviceMapping[att.Value.GetStringValue()] = append(s.serviceMapping[att.Value.GetStringValue()], id)
-			}
-		}
-
-		for _, sm := range rm.ScopeMetrics {
-			for _, m := range sm.Metrics {
-				s.store.AddValue(m.Name)
-			}
-		}
-	}
+	s.store.AddMetrics(req.ResourceMetrics)
 
 	return new(v1.ExportMetricsServiceResponse), nil
+}
+
+func writeToWal(req *v1.ExportMetricsServiceRequest) error {
+	// open a new log file
+	log, err := wal.Open("/minifana/metrics/wal", nil)
+
+	if err != nil {
+		return err
+	}
+
+	li, err := log.LastIndex()
+
+	if err != nil {
+		return err
+	}
+
+	res, err := proto.Marshal(req)
+
+	if err != nil {
+		return err
+	}
+
+	err = log.Write(li+1, res)
+
+	if err != nil {
+		return err
+	}
+
+	return log.Close()
 }

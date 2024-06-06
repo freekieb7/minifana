@@ -4,7 +4,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func NewGrpcService(store MemoryStore) *grpc.Server {
+func NewGrpcService(store MetricsStore) *grpc.Server {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	metricsService := NewMetricsService(store)
