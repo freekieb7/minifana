@@ -2,64 +2,43 @@ package main
 
 import (
 	"github.com/gofiber/fiber/v3"
-	v1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 )
 
-type AppService interface {
-	Home(c fiber.Ctx) error
-	GetServiceNames(ctx fiber.Ctx) error
-	GetServiceMetrics(ctx fiber.Ctx) error
-	GetMetricNames(ctx fiber.Ctx) error
-	GetTest(ctx fiber.Ctx) error
+type AppService struct {
+	metricsStore *MetricsStore
 }
 
-type appService struct {
-	metricsStore MetricsStore
-}
+func (s *AppService) Home(ctx fiber.Ctx) error {
+	m, err := s.metricsStore.Metrics()
 
-func NewAppService(metricsStore MetricsStore) AppService {
-	return &appService{
-		metricsStore: metricsStore,
+	if err != nil {
+		return err
 	}
+
+	return ctx.JSON(m)
 }
 
-func (s *appService) Home(c fiber.Ctx) error {
-	return c.Render("test", fiber.Map{
-		"Options": nil,
-		"Dates":   nil,
-	})
+func (s *AppService) Filter(ctx fiber.Ctx) error {
+	name := ctx.Query("name")
+	value := ctx.Query("value")
+
+	metrics, err := s.metricsStore.Filter(name, value)
+
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(metrics)
 }
 
-func (s *appService) GetServiceNames(ctx fiber.Ctx) error {
+func (s *AppService) GetServiceNames(ctx fiber.Ctx) error {
 	serviceNames := make([]string, 0)
 
 	return ctx.JSON(serviceNames)
 }
 
-func (s *appService) GetServiceMetrics(ctx fiber.Ctx) error {
+func (s *AppService) GetServiceMetrics(ctx fiber.Ctx) error {
 	metricNames := make([]string, 0)
 
 	return ctx.JSON(metricNames)
-}
-
-func (s *appService) GetMetricNames(ctx fiber.Ctx) error {
-	return ctx.Render("options", fiber.Map{
-		"Options": s.metricsStore.Names(),
-	})
-}
-
-func (s *appService) GetTest(ctx fiber.Ctx) error {
-	var n string
-	var v []*v1.NumberDataPoint
-
-	for name, values := range s.metricsStore.Metrics() {
-		n = name
-		v = values
-		break
-	}
-
-	return ctx.Render("more", fiber.Map{
-		"Name":   n,
-		"Values": v,
-	})
 }

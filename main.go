@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/template/html/v2"
 	"log"
 	"net"
 )
@@ -17,22 +16,15 @@ var (
 func main() {
 	flag.Parse()
 
-	engine := html.New("./view", ".html")
-	//engine.Reload(true)
+	app := fiber.New()
 
-	app := fiber.New(fiber.Config{
-		Views: engine,
-	})
-
-	ms := NewMetricsStore()
-
-	appService := NewAppService(ms)
+	metricsStore := NewMetricsStore()
+	appService := AppService{metricsStore}
 
 	app.Get("/", appService.Home)
-	app.Get("/metrics/names", appService.GetMetricNames)
-	app.Get("/metrics/test", appService.GetTest)
+	app.Get("/filter", appService.Filter)
 
-	grpcService := NewGrpcService(ms)
+	grpcService := NewGrpcService(metricsStore)
 
 	go func() {
 		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
