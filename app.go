@@ -2,6 +2,10 @@ package main
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"log"
+	"net/url"
+	"strconv"
+	"strings"
 )
 
 type AppService struct {
@@ -19,10 +23,15 @@ func (s *AppService) Home(ctx fiber.Ctx) error {
 }
 
 func (s *AppService) Filter(ctx fiber.Ctx) error {
-	name := ctx.Query("name")
-	value := ctx.Query("value")
+	startTime, _ := strconv.ParseUint(ctx.Query("s"), 10, 64)
+	endTime, _ := strconv.ParseUint(ctx.Query("e"), 10, 64)
 
-	metrics, err := s.metricsStore.Filter(name, value)
+	log.Println(startTime)
+
+	q := strings.Trim(ctx.Query("q"), "\"")
+	queryValues, _ := url.ParseQuery(q)
+
+	metrics, err := s.metricsStore.Filter(startTime, endTime, queryValues)
 
 	if err != nil {
 		return err

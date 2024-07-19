@@ -7,6 +7,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/proto"
 	"log"
+	"net/url"
 )
 
 const (
@@ -74,7 +75,7 @@ func (store *MetricsStore) AddToWal(req *collector_v1.ExportMetricsServiceReques
 	return nil
 }
 
-func (store *MetricsStore) Filter(name string, value string) ([]*Metric, error) {
+func (store *MetricsStore) Filter(startTimestamp uint64, endTimestamp uint64, values url.Values) ([]*Metric, error) {
 	filtered := make([]*Metric, 0)
 	metrics, err := store.Metrics()
 
@@ -82,14 +83,25 @@ func (store *MetricsStore) Filter(name string, value string) ([]*Metric, error) 
 		return filtered, err
 	}
 
+out:
 	for _, metric := range metrics {
-		if val, ok := metric.Attributes[name]; ok {
-			log.Println(val)
-			if val == value {
-
-				filtered = append(filtered, metric)
+		for n, v := range values {
+			if val, ok := metric.Attributes[n]; ok {
+				if val != v[0] {
+					break out
+				}
+			} else {
+				break out
 			}
 		}
+
+		for _, v := range metric.Values {
+			if v.Timestamp >= startTimestamp && v.Timestamp >= endTimestamp {
+				filtered = append(filtered, metric)
+				break out
+			}
+		}
+
 	}
 
 	return filtered, nil
