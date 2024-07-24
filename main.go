@@ -1,57 +1,75 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"github.com/gofiber/fiber/v3"
+	"github.com/acontrolfreak/minifana/metrics"
+	"google.golang.org/grpc"
 	"log"
 	"net"
+	"net/http"
+	"os"
 )
 
-var (
-	grpcPort = flag.Int("grpc_port", 4317, "The server's GRPC port")
-	httpPort = flag.Int("http_port", 4318, "The server's HTTP port")
+const (
+	telemetryGrpcPort = 4317
+	telemetryHttpPort = 4318
+	apiPort           = 8081
 )
 
 func main() {
-	flag.Parse()
+	grpcServer := grpc.NewServer()
 
-	app := fiber.New()
+	metricsStorageFile, err := os.CreateTemp("", "metrics_storage*.bin")
+	//metricsStorageFile, err := os.Create("/tmp/metrics_storage3797485148.bin")
 
-	metricsStore := NewMetricsStore()
-	appService := AppService{metricsStore}
+	if err != nil {
+		panic(err)
+	}
 
-	app.Get("/", appService.Home)
-	app.Get("/filter", appService.Filter)
+	log.Println(metricsStorageFile.Name())
 
-	grpcService := NewGrpcService(metricsStore)
+	defer os.Remove(metricsStorageFile.Name())
+
+	metricsController := metrics.Controller{
+		StorageFile: metricsStorageFile,
+	}
+	metricsController.Register(grpcServer)
+
+	//traceService := NewTraceService()
+	//logsService := NewLogsService()
+
+	//traceService.Register(grpcServer)
+	//logsService.Register(grpcServer)
 
 	go func() {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", telemetryGrpcPort))
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}
 
 		log.Printf("server listening at %v", lis.Addr())
-		if err := grpcService.Serve(lis); err != nil {
+		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
 
 	go func() {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *httpPort))
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", telemetryHttpPort))
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}
 
 		log.Printf("server listening at %v", lis.Addr())
-		if err := grpcService.Serve(lis); err != nil {
+		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 
 		}
 	}()
 
-	log.Printf("server listening at %v", 8081)
-	app.Listen("0.0.0.0:8081")
+	log.Printf("server listening at %v", apiPort)
 
+	http.HandleFunc("/hello", func(writer http.ResponseWriter, request *http.Request) {
+		metricsController.Read()
+	})
+	http.ListenAndServe(fmt.Sprintf(":%d", apiPort), nil)
 }
